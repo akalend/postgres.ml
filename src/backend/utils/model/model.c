@@ -154,6 +154,10 @@ TransformMetric(char* metric)
 	{
 		return "AUC";
 	}
+	if (strcmp(metric, "ndcg") == 0)
+	{
+		return "NDCG";
+	}
 
 	return "";
 }
@@ -229,6 +233,9 @@ CreateJsonModelParameters(CreateModelStmt *stmt)
 					len = buf.len;
 					*(buf.data + len - 1) = ']';
 				}
+				break;
+			case MODEL_PARAMETER_GROUP_BY:
+				appendStringInfo(&buf, "\"group_by\":\"%s\"",opt->value);
 				break;
 
 			default:
