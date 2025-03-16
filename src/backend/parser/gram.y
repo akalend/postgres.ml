@@ -6474,6 +6474,14 @@ CreateModelStmt:
 				n->elements = NULL;
 				$$ = (Node *) n;
 			}
+		| GROUP_P BY name
+			{
+				ModelOptElement *n = makeNode(ModelOptElement);
+				n->parm = MODEL_PARAMETER_GROUP_BY;
+				n->value = pstrdup($3);
+				n->elements = NULL;
+				$$ = (Node *) n;
+			}
 	;
 
 

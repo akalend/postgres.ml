@@ -4078,6 +4078,7 @@ typedef enum ModelParameter {
     MODEL_PARAMETER_IGNORE, 
     MODEL_PARAMETER_LOSS_FUNCTION, 
     MODEL_PARAMETER_EVAL_METRIC, 
+    MODEL_PARAMETER_GROUP_BY, 
 } ModelParameter;
 
 typedef struct ModelOptElement
