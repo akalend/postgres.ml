@@ -1,0 +1,76 @@
+FROM ubuntu:22.04 AS base
+MAINTAINER Alexandre Kalendarev <akalend@mail.ru>
+ENV TZ=UTC
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+
+RUN apt update && apt install -y \
+    bison \
+    bzip2 \
+    cpanminus \
+    curl \
+    flex \
+    gcc \
+    git \
+    libcurl4-gnutls-dev \
+    libicu-dev \
+    libperl-dev \
+    liblz4-dev \
+    libpam0g-dev \
+    libreadline-dev \
+    libssl-dev \
+    locales \
+    make \
+    perl \
+    pkg-config \
+    python3 \
+    python3-pip \
+    software-properties-common \
+    sudo \
+    wget \
+    zlib1g-dev \
+ && add-apt-repository ppa:deadsnakes/ppa -y \
+ && apt install -y \
+    python3.9-full \
+ # software properties pulls in pkexec, which makes the debugger unusable in vscode
+ && apt purge -y \
+    software-properties-common \
+ && apt autoremove -y \
+ && apt clean
+
+RUN sudo pip3 install pipenv pipenv-shebang
+
+RUN cpanm install IPC::Run
+
+RUN locale-gen en_US.UTF-8
+
+RUN useradd -ms /bin/bash postgres \
+ && usermod -aG sudo postgres \
+ && echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
+
+WORKDIR /home/postgres
+USER postgres
+
+RUN pip3 install catboost pandas && wget https://github.com/catboost/catboost/releases/download/v1.2.7/libcatboostmodel.so && \
+     sudo cp libcatboostmodel.so /usr/local/lib
+
+ENV PATH=/usr/bin:/usr/local/bin:/usr/local/pgsql/bin:/home/postgres/.local/bin
+ENV LD_LIBRARY_PATH=/usr/local/lib
+ENV PGDATA = /usr/local/pgsql/data
+ENV PGPORT=5432
+RUN echo "export MAKEFLAGS=\"-j \$(nproc)\"" >> "/home/postgres/.bashrc"
+
+
+RUN git clone --branch rel_16_ML --depth 1 https://github.com/akalend/postgres.ml.git && \
+	cd postgres.ml && \
+    ./configure --with-python3   && make && sudo make install && \
+    cd /usr/local/pgsql && sudo mkdir data && sudo chown postgres data && initdb -D data && \
+    pg_ctl -D data -l /tmp/log start
+
+
+
+EXPOSE 5432
+ENTRYPOINT /usr/local/pgsql/bin/psql 
+
+
+
+

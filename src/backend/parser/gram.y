@@ -297,7 +297,6 @@ static Node *makeRecursiveViewSelect(char *relname, List *aliases, Node *query);
 		AnalyzeStmt CallStmt ClosePortalStmt ClusterStmt CommentStmt
 		ConstraintsSetStmt CopyStmt CreateAsStmt CreateCastStmt
 		CreateDomainStmt CreateExtensionStmt CreateGroupStmt CreateOpClassStmt
-		CreateModelStmt 
 		CreateOpFamilyStmt AlterOpFamilyStmt CreatePLangStmt
 		CreateSchemaStmt CreateSeqStmt CreateStmt CreateStatsStmt CreateTableSpaceStmt
 		CreateFdwStmt CreateForeignServerStmt CreateForeignTableStmt
@@ -667,6 +666,7 @@ static Node *makeRecursiveViewSelect(char *relname, List *aliases, Node *query);
 /*
  * MODEL options
  */
+%type <node>	CreateModelStmt
 %type <node>	PredictModelStmt
 %type <node>	OptModelElement 
 %type <list>	OptModelElements OptModelElementList
@@ -745,7 +745,7 @@ static Node *makeRecursiveViewSelect(char *relname, List *aliases, Node *query);
 	LOCALTIME LOCALTIMESTAMP LOCATION LOCK_P LOCKED LOGGED LOSS
 
 	MAPPING MATCH MATCHED MATERIALIZED MAXVALUE MERGE METHOD
-	MINUTE_P MINVALUE MODE MONTH_P MOVE MODEL
+	MINUTE_P MINVALUE MODE  MODEL MONTH_P MOVE
 
 	NAME_P NAMES NATIONAL NATURAL NCHAR NEW NEXT NFC NFD NFKC NFKD NO NONE
 	NORMALIZE NORMALIZED
