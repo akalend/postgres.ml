@@ -1,5 +1,5 @@
 FROM ubuntu:22.04 AS base
-MAINTAINER Alexandre Kalendarev <akalend@mail.ru>
+LABEL MAINTAINER Alexandre Kalendarev <akalend@mail.ru>
 ENV TZ=UTC
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
@@ -27,6 +27,7 @@ RUN apt update && apt install -y \
     software-properties-common \
     sudo \
     wget \
+    net-tools \
     zlib1g-dev \
  && add-apt-repository ppa:deadsnakes/ppa -y \
  && apt install -y \
@@ -63,13 +64,35 @@ RUN echo "export MAKEFLAGS=\"-j \$(nproc)\"" >> "/home/postgres/.bashrc"
 RUN git clone --branch rel_16_ML --depth 1 https://github.com/akalend/postgres.ml.git && \
 	cd postgres.ml && \
     ./configure --with-python3   && make && sudo make install && \
-    cd /usr/local/pgsql && sudo mkdir data && sudo chown postgres data && initdb -D data && \
-    pg_ctl -D data -l /tmp/log start
+    cd /usr/local/pgsql && sudo mkdir data && sudo chown postgres data 
 
+RUN install --verbose --directory --owner postgres --group postgres --mode 3777 /var/run/postgresql
 
+ENV PGDATA /var/lib/postgresql/data
+# this 1777 will be replaced by 0700 at runtime (allows semi-arbitrary "--user" values)
+RUN install --verbose --directory --owner postgres --group postgres --mode 1777 "$PGDATA"
+VOLUME /var/lib/postgresql/data
+
+COPY docker-entrypoint.sh docker-ensure-initdb.sh /usr/local/bin/
+RUN ln -sT docker-ensure-initdb.sh /usr/local/bin/docker-enforce-initdb.sh
+ENTRYPOINT ["docker-entrypoint.sh"]
+
+# We set the default STOPSIGNAL to SIGINT, which corresponds to what PostgreSQL
+# calls "Fast Shutdown mode" wherein new connections are disallowed and any
+# in-progress transactions are aborted, allowing PostgreSQL to stop cleanly and
+# flush tables to disk.
+#
+# See https://www.postgresql.org/docs/current/server-shutdown.html for more details
+# about available PostgreSQL server shutdown signals.
+#
+# See also https://www.postgresql.org/docs/current/server-start.html for further
+# justification of this as the default value, namely that the example (and
+# shipped) systemd service files use the "Fast Shutdown mode" for service
+# termination.
+#
+STOPSIGNAL SIGINT
 
 EXPOSE 5432
-ENTRYPOINT /usr/local/pgsql/bin/psql 
 
 
 
