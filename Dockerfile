@@ -1,11 +1,12 @@
 FROM ubuntu:22.04 AS base
-MAINTAINER Alexandre Kalendarev <akalend@mail.ru>
+LABEL MAINTAINER Alexandre Kalendarev <akalend@mail.ru>
 ENV TZ=UTC
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
 RUN apt update && apt install -y \
     bison \
     bzip2 \
+    unzip \
     cpanminus \
     curl \
     flex \
@@ -29,6 +30,7 @@ RUN apt update && apt install -y \
     python3 \
     python3-pip \
     wget \
+    net-tools \
     zlib1g-dev \
  && add-apt-repository ppa:deadsnakes/ppa -y \
  && apt install -y \
@@ -64,18 +66,18 @@ RUN echo "export MAKEFLAGS=\"-j \$(nproc)\"" >> "/home/postgres/.bashrc"
 
 
 RUN git clone --branch rel_16_ML --depth 1 https://github.com/akalend/postgres.ml.git && \
-	cd postgres.ml && \
-    ./configure --with-python && make && sudo make install && \
-    cd contrib && git clone https://github.com/akalend/pg_catboost.git && \
-      cd pg_catboost && make && sudo make install
+	cd postgres.ml && ./configure --with-python && make && sudo make install && \
+   cd contrib && git clone https://github.com/akalend/pg_catboost.git && \
+   cd pg_catboost && make && sudo make install
 
 WORKDIR /usr/local/pgsql/
 COPY docker-ensure.sh docker-ensure.sh
+COPY data.zip .
+RUN  sudo unzip data.zip && chonw -R postgres data
+
+COPY docker-entrypoint.sh docker-ensure-initdb.sh /usr/local/bin/
 
 VOLUME /usr/local/pgsql/data
 EXPOSE 5432
+
 ENTRYPOINT bash docker-ensure.sh 
-
-
-
-
