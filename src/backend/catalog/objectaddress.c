@@ -1163,6 +1163,7 @@ get_object_address(ObjectType objtype, Node *object,
 				address.objectId = get_statistics_object_oid(castNode(List, object),
 															 missing_ok);
 				address.objectSubId = 0;
+				break;
 			case OBJECT_MODEL:
 				elog(ERROR, "unrecognized object type OBJECT_MODEL :%s:%d", __FILE__,__LINE__);
 

@@ -26,6 +26,8 @@ RUN apt update && apt install -y \
     python3-pip \
     software-properties-common \
     sudo \
+    python3 \
+    python3-pip \
     wget \
     zlib1g-dev \
  && add-apt-repository ppa:deadsnakes/ppa -y \
@@ -56,20 +58,23 @@ RUN pip3 install catboost pandas && wget https://github.com/catboost/catboost/re
 ENV PATH=/usr/bin:/usr/local/bin:/usr/local/pgsql/bin:/home/postgres/.local/bin
 ENV LD_LIBRARY_PATH=/usr/local/lib
 ENV PGDATA = /usr/local/pgsql/data
+ENV PGHOME = /usr/local/pgsql
 ENV PGPORT=5432
 RUN echo "export MAKEFLAGS=\"-j \$(nproc)\"" >> "/home/postgres/.bashrc"
 
 
 RUN git clone --branch rel_16_ML --depth 1 https://github.com/akalend/postgres.ml.git && \
 	cd postgres.ml && \
-    ./configure --with-python3   && make && sudo make install && \
-    cd /usr/local/pgsql && sudo mkdir data && sudo chown postgres data && initdb -D data && \
-    pg_ctl -D data -l /tmp/log start
+    ./configure --with-python && make && sudo make install && \
+    cd contrib && git clone https://github.com/akalend/pg_catboost.git && \
+      cd pg_catboost && make && sudo make install
 
+WORKDIR /usr/local/pgsql/
+COPY docker-ensure.sh docker-ensure.sh
 
-
+VOLUME /usr/local/pgsql/data
 EXPOSE 5432
-ENTRYPOINT /usr/local/pgsql/bin/psql 
+ENTRYPOINT bash docker-ensure.sh 
 
 
 
