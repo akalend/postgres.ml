@@ -81,3 +81,4 @@ VOLUME /usr/local/pgsql/data
 EXPOSE 5432
 
 ENTRYPOINT bash /usr/local/pgsql/docker-ensure.sh 
+CMD bash /usr/local/pgsql/docker-ensure.sh
