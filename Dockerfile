@@ -75,8 +75,6 @@ COPY docker-ensure.sh docker-ensure.sh
 COPY datasets.dmp.gz .
 RUN  sudo gzip -d datasets.dmp.gz 
 
-COPY docker-entrypoint.sh docker-ensure-initdb.sh /usr/local/bin/
-
 VOLUME /usr/local/pgsql/data
 EXPOSE 5432
 
