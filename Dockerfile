@@ -6,7 +6,7 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 RUN apt update && apt install -y \
     bison \
     bzip2 \
-    unzip \
+    gzip \
     cpanminus \
     curl \
     flex \
@@ -72,12 +72,12 @@ RUN git clone --branch rel_16_ML --depth 1 https://github.com/akalend/postgres.m
 
 WORKDIR /usr/local/pgsql/
 COPY docker-ensure.sh docker-ensure.sh
-COPY data.zip .
-RUN  sudo unzip data.zip && chonw -R postgres data
+COPY datasets.dmp.gz .
+RUN  sudo gzip -d datasets.dmp.gz 
 
 COPY docker-entrypoint.sh docker-ensure-initdb.sh /usr/local/bin/
 
 VOLUME /usr/local/pgsql/data
 EXPOSE 5432
 
-ENTRYPOINT bash docker-ensure.sh 
+ENTRYPOINT bash /usr/local/pgsql/docker-ensure.sh 
