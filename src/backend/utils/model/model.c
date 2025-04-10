@@ -457,15 +457,53 @@ TupleDesc GetPredictModelResultDesc(PredictModelStmt *node){
 	ScanKeyData skey[1];
 	Form_pg_class form;
 	Oid PredictTableOid;
+	int32 attCount;
 
 	form = GetPredictTableFormByName((const char*)node->tablename);
 	PredictTableOid = form->oid;
-
-	tupdesc = CreateTemplateTupleDesc(form->relnatts +1);
-
 	rel = table_open(AttributeRelationId, RowExclusiveLock);
 	idxrel = index_open(AttributeRelidNumIndexId, AccessShareLock);
 
+	scan = index_beginscan(rel, idxrel, GetTransactionSnapshot(), 1, 0);
+
+	ScanKeyInit((ScanKey)&skey,
+				Anum_pg_attribute_attrelid,
+				BTEqualStrategyNumber, F_OIDEQ,
+				ObjectIdGetDatum(PredictTableOid));
+
+	index_rescan(scan, skey, 1, NULL, 0 );
+
+	attCount = form->relnatts;
+	slot = table_slot_create(rel, NULL);
+	//  check deleted fields
+	while (index_getnext_slot(scan, ForwardScanDirection, slot))
+	{
+		Form_pg_attribute record;
+		bool should_free;
+		tup = ExecFetchSlotHeapTuple(slot, false, &should_free);
+		record = (Form_pg_attribute) GETSTRUCT(tup);
+
+		if (record->atttypid == 0)
+		{
+			// deleting attributes
+			attCount --;
+			elog(WARNING, "deleted %d %s attnum=%d", record->attnum, NameStr(record->attname), attCount);
+
+			continue;
+		}
+	}
+	attCount ++;
+	index_endscan(scan);
+	index_close(idxrel, AccessShareLock);
+	ExecDropSingleTupleTableSlot(slot);
+
+
+// TODO попробовать TupleDescCopyEntry(TupleDesc dst, AttrNumber dstAttno,
+							   TupleDesc src, AttrNumber srcAttno);
+
+	tupdesc = CreateTemplateTupleDesc(attCount);
+	elog(WARNING, "CreateTemplateTupleDesc coun=%d", attCount );
+	idxrel = index_open(AttributeRelidNumIndexId, AccessShareLock);
 	scan = index_beginscan(rel, idxrel, GetTransactionSnapshot(), 1, 0);
 
 	ScanKeyInit((ScanKey)&skey,
@@ -484,11 +522,16 @@ TupleDesc GetPredictModelResultDesc(PredictModelStmt *node){
 		tup = ExecFetchSlotHeapTuple(slot, false, &should_free);
 		record = (Form_pg_attribute) GETSTRUCT(tup);
 		if (record->attnum < 0) continue;
-		TupleDescInitEntry(tupdesc, (AttrNumber) record->attnum, NameStr(record->attname),
-			record->atttypid, -1, 0);
+		if (record->atttypid == 0) continue;
+
+		elog(WARNING, "attnum %d %s", record->attnum, NameStr(record->attname));
+		TupleDescInitEntry(tupdesc, (AttrNumber) record->attnum, 
+			NameStr(record->attname), record->atttypid, -1, 0);
 	}
 
-	TupleDescInitEntry(tupdesc, (AttrNumber) (form->relnatts + 1), "ml result",
+	elog(WARNING, "attnum %d %s", attCount, "ML*****");
+
+	TupleDescInitEntry(tupdesc, (AttrNumber)attCount, "ml result",
 			TEXTOID, -1, 0);
 
 	index_endscan(scan);
