@@ -1864,7 +1864,27 @@ exec_replication_command(const char *cmd_string)
 			}
 			break;
 
+		case T_CreateModelStmt:
+			{
+				DestReceiver *dest = CreateDestReceiver(DestRemoteSimple);
+				VariableShowStmt *n = (VariableShowStmt *) cmd_node;
+				elog(NOTICE, "%s:%d",__FUNCTION__,__LINE__);
+
+				cmdtag = "CREATE_MODEL";
+				set_ps_display(cmdtag);
+
+				/* syscache access needs a transaction environment */
+				StartTransactionCommand();
+				elog(LOG, "walsender.c:1878, CREATE_MODEL tag");
+				// GetPGVariable(n->name, dest);
+				CommitTransactionCommand();
+				EndReplicationCommand(cmdtag);
+			}
+			break;
+
 		default:
+
+
 			elog(ERROR, "unrecognized replication command node tag: %u",
 				 cmd_node->type);
 	}

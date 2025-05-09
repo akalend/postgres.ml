@@ -69,6 +69,7 @@
 #include "tcop/utility.h"
 #include "utils/acl.h"
 #include "utils/guc.h"
+#include "utils/model.h"
 #include "utils/lsyscache.h"
 #include "utils/rel.h"
 #include "utils/syscache.h"
@@ -321,6 +322,9 @@ ClassifyUtilityCommandAsReadOnly(Node *parsetree)
 
 		case T_ExplainStmt:
 		case T_VariableShowStmt:
+		case T_CreateModelStmt:
+		case T_PredictModelStmt:
+		case T_LoadModelStmt:
 			{
 				/*
 				 * These commands don't modify any data and are safe to run in
@@ -1070,6 +1074,24 @@ standard_ProcessUtility(PlannedStmt *pstmt,
 									   dest, qc);
 				else
 					ExecSecLabelStmt(stmt);
+				break;
+			}
+		case T_CreateModelStmt:
+			{
+				CreateModelStmt *stmt = (CreateModelStmt*) parsetree;
+				CreateModelExecuteStmt(stmt, dest);
+				break;
+			}
+		case T_PredictModelStmt:
+			{
+				CreateModelStmt *stmt = (CreateModelStmt*) parsetree;
+				PredictModelExecuteStmt(stmt,dest);
+				break;
+			}
+		case T_LoadModelStmt:
+			{
+				LoadModelStmt *stmt = (LoadModelStmt*) parsetree;
+				LoadModelExecuteStmt(stmt);
 				break;
 			}
 
@@ -2068,6 +2090,14 @@ UtilityReturnsTuples(Node *parsetree)
 		case T_VariableShowStmt:
 			return true;
 
+		case T_CreateModelStmt:
+		case T_PredictModelStmt:
+			return true;
+
+		case T_LoadModelStmt:
+			return false;
+
+
 		default:
 			return false;
 	}
@@ -2122,6 +2152,17 @@ UtilityTupleDescriptor(Node *parsetree)
 
 				return GetPGVariableResultDesc(n->name);
 			}
+
+		case T_CreateModelStmt:
+			{
+				return GetCreateModelResultDesc();
+			}
+		case T_PredictModelStmt:
+			{
+				PredictModelStmt *n = (PredictModelStmt *) parsetree;
+				return GetPredictModelResultDesc(n);
+			}
+
 
 		default:
 			return NULL;
@@ -3227,6 +3268,16 @@ CreateCommandTag(Node *parsetree)
 			}
 			break;
 
+		case T_CreateModelStmt:
+			tag = CMDTAG_CREATE_MODEL;
+			break;
+		case T_PredictModelStmt:
+			tag = CMDTAG_PREDICT_MODEL;
+			break;
+		case T_LoadModelStmt:
+			tag = CMDTAG_LOAD_MODEL;
+			break;
+
 		default:
 			elog(WARNING, "unrecognized node type: %d",
 				 (int) nodeTag(parsetree));
@@ -3761,6 +3812,11 @@ GetCommandLogLevel(Node *parsetree)
 			}
 			break;
 
+		case T_CreateModelStmt:
+			{
+				lev = LOGSTMT_ALL;
+				break;
+			}
 		default:
 			elog(WARNING, "unrecognized node type: %d",
 				 (int) nodeTag(parsetree));

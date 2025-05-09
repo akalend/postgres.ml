@@ -943,6 +943,7 @@ EventTriggerSupportsObjectType(ObjectType obtype)
 			/* no support for global objects */
 			return false;
 		case OBJECT_EVENT_TRIGGER:
+		case OBJECT_MODEL:
 			/* no support for event triggers on event triggers */
 			return false;
 		case OBJECT_ACCESS_METHOD:
@@ -2066,6 +2067,7 @@ stringify_grant_objtype(ObjectType objtype)
 		case OBJECT_FOREIGN_TABLE:
 		case OBJECT_INDEX:
 		case OBJECT_MATVIEW:
+		case OBJECT_MODEL:
 		case OBJECT_OPCLASS:
 		case OBJECT_OPERATOR:
 		case OBJECT_OPFAMILY:
@@ -2149,6 +2151,7 @@ stringify_adefprivs_objtype(ObjectType objtype)
 		case OBJECT_FOREIGN_TABLE:
 		case OBJECT_INDEX:
 		case OBJECT_MATVIEW:
+		case OBJECT_MODEL:
 		case OBJECT_OPCLASS:
 		case OBJECT_OPERATOR:
 		case OBJECT_OPFAMILY:

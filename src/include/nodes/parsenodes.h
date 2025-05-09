@@ -28,6 +28,7 @@
 #include "nodes/primnodes.h"
 #include "nodes/value.h"
 #include "partitioning/partdefs.h"
+#include "partitioning/partdefs.h"
 
 
 typedef enum OverridingKind
@@ -2102,6 +2103,7 @@ typedef enum ObjectType
 	OBJECT_LANGUAGE,
 	OBJECT_LARGEOBJECT,
 	OBJECT_MATVIEW,
+	OBJECT_MODEL,	
 	OBJECT_OPCLASS,
 	OBJECT_OPERATOR,
 	OBJECT_OPFAMILY,
@@ -4046,5 +4048,71 @@ typedef struct DropSubscriptionStmt
 	bool		missing_ok;		/* Skip error if missing? */
 	DropBehavior behavior;		/* RESTRICT or CASCADE behavior */
 } DropSubscriptionStmt;
+
+/* ----------------------
+ *		MODEL Type Statement
+ * ----------------------
+ */
+
+typedef enum ModelType
+{
+	MODEL_TYPE_UNDEFINED,
+	MODEL_TYPE_CLASSIFICATION,
+	MODEL_TYPE_REGRESSION,
+	MODEL_TYPE_RANKING,
+} ModelType;
+
+typedef struct CreateModelStmt
+{
+	NodeTag			type;
+	ObjectType		objectType;		/* OBJECT_FUNCTION, OBJECT_TRIGGER, etc */
+	char	   		*modelname;		/* Model name */
+	char	   		*tablename;		/* data table for learning dataset  */
+	ModelType modelclass;		/* class of model  */
+	List	   		*options;		/* List of Options nodes */
+} CreateModelStmt;
+
+typedef enum ModelParameter {
+    MODEL_PARAMETER_NONE = 0,
+    MODEL_PARAMETER_TARGET  = 1,
+    MODEL_PARAMETER_IGNORE, 
+    MODEL_PARAMETER_LOSS_FUNCTION, 
+    MODEL_PARAMETER_EVAL_METRIC, 
+    MODEL_PARAMETER_GROUP_BY, 
+} ModelParameter;
+
+typedef struct ModelOptElement
+{
+	NodeTag		type;
+	int			 parm;
+	char 		*value;
+	List 		*elements;
+} ModelOptElement;
+
+typedef struct StrModelElement
+{
+	NodeTag		type;
+	char 		*value;
+} StrModelElement;
+
+
+typedef struct PredictModelStmt
+{
+	NodeTag			type;
+	ObjectType		objectType;		/* OBJECT_FUNCTION, OBJECT_TRIGGER, etc */
+	char	   		*modelname;		/* Model name */
+	char	   		*tablename;		/* data table for learning dataset  */
+} PredictModelStmt;
+
+
+typedef struct LoadModelStmt
+{
+	NodeTag			type;
+	ObjectType		objectType;		/* OBJECT_FUNCTION, OBJECT_TRIGGER, etc */
+	char	   		*modelname;		/* Model name */
+	char	   		*filename;		/* model filename  */
+} LoadModelStmt;
+
+
 
 #endif							/* PARSENODES_H */

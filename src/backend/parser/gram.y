@@ -62,8 +62,12 @@
 #include "storage/lmgr.h"
 #include "utils/date.h"
 #include "utils/datetime.h"
+#include "utils/model.h"
 #include "utils/numeric.h"
 #include "utils/xml.h"
+
+
+
 
 
 /*
@@ -659,6 +663,16 @@ static Node *makeRecursiveViewSelect(char *relname, List *aliases, Node *query);
 				json_object_constructor_null_clause_opt
 				json_array_constructor_null_clause_opt
 
+/*
+ * MODEL options
+ */
+%type <node>	CreateModelStmt
+%type <node>	PredictModelStmt
+%type <node>	OptModelElement 
+%type <list>	OptModelElements OptModelElementList
+%type <node>	StrModelElement
+%type <list>	StrModelElements StrModelElementList
+%type <node>	LoadModelStmt
 
 /*
  * Non-keyword token types.  These are hard-wired into the "flex" lexer.
@@ -693,7 +707,7 @@ static Node *makeRecursiveViewSelect(char *relname, List *aliases, Node *query);
 	BOOLEAN_P BOTH BREADTH BY
 
 	CACHE CALL CALLED CASCADE CASCADED CASE CAST CATALOG_P CHAIN CHAR_P
-	CHARACTER CHARACTERISTICS CHECK CHECKPOINT CLASS CLOSE
+	CHARACTER CHARACTERISTICS CHECK CHECKPOINT CLASS CLASSIFICATION CLOSE
 	CLUSTER COALESCE COLLATE COLLATION COLUMN COLUMNS COMMENT COMMENTS COMMIT
 	COMMITTED COMPRESSION CONCURRENTLY CONFIGURATION CONFLICT
 	CONNECTION CONSTRAINT CONSTRAINTS CONTENT_P CONTINUE_P CONVERSION_P COPY
@@ -706,7 +720,7 @@ static Node *makeRecursiveViewSelect(char *relname, List *aliases, Node *query);
 	DETACH DICTIONARY DISABLE_P DISCARD DISTINCT DO DOCUMENT_P DOMAIN_P
 	DOUBLE_P DROP
 
-	EACH ELSE ENABLE_P ENCODING ENCRYPTED END_P ENUM_P ESCAPE EVENT EXCEPT
+	EACH ELSE ENABLE_P ENCODING ENCRYPTED END_P ENUM_P ESCAPE EVAL EVENT EXCEPT
 	EXCLUDE EXCLUDING EXCLUSIVE EXECUTE EXISTS EXPLAIN EXPRESSION
 	EXTENSION EXTERNAL EXTRACT
 
@@ -717,7 +731,7 @@ static Node *makeRecursiveViewSelect(char *relname, List *aliases, Node *query);
 
 	HANDLER HAVING HEADER_P HOLD HOUR_P
 
-	IDENTITY_P IF_P ILIKE IMMEDIATE IMMUTABLE IMPLICIT_P IMPORT_P IN_P INCLUDE
+	IDENTITY_P IF_P IGNORED ILIKE IMMEDIATE IMMUTABLE IMPLICIT_P IMPORT_P IN_P INCLUDE
 	INCLUDING INCREMENT INDENT INDEX INDEXES INHERIT INHERITS INITIALLY INLINE_P
 	INNER_P INOUT INPUT_P INSENSITIVE INSERT INSTEAD INT_P INTEGER
 	INTERSECT INTERVAL INTO INVOKER IS ISNULL ISOLATION
@@ -728,10 +742,10 @@ static Node *makeRecursiveViewSelect(char *relname, List *aliases, Node *query);
 
 	LABEL LANGUAGE LARGE_P LAST_P LATERAL_P
 	LEADING LEAKPROOF LEAST LEFT LEVEL LIKE LIMIT LISTEN LOAD LOCAL
-	LOCALTIME LOCALTIMESTAMP LOCATION LOCK_P LOCKED LOGGED
+	LOCALTIME LOCALTIMESTAMP LOCATION LOCK_P LOCKED LOGGED LOSS
 
 	MAPPING MATCH MATCHED MATERIALIZED MAXVALUE MERGE METHOD
-	MINUTE_P MINVALUE MODE MONTH_P MOVE
+	MINUTE_P MINVALUE MODE  MODEL MONTH_P MOVE
 
 	NAME_P NAMES NATIONAL NATURAL NCHAR NEW NEXT NFC NFD NFKC NFKD NO NONE
 	NORMALIZE NORMALIZED
@@ -744,13 +758,13 @@ static Node *makeRecursiveViewSelect(char *relname, List *aliases, Node *query);
 
 	PARALLEL PARAMETER PARSER PARTIAL PARTITION PASSING PASSWORD
 	PLACING PLANS POLICY
-	POSITION PRECEDING PRECISION PRESERVE PREPARE PREPARED PRIMARY
+	POSITION PRECEDING PRECISION PREDICT PRESERVE PREPARE PREPARED PRIMARY
 	PRIOR PRIVILEGES PROCEDURAL PROCEDURE PROCEDURES PROGRAM PUBLICATION
 
 	QUOTE
 
-	RANGE READ REAL REASSIGN RECHECK RECURSIVE REF_P REFERENCES REFERENCING
-	REFRESH REINDEX RELATIVE_P RELEASE RENAME REPEATABLE REPLACE REPLICA
+	RANGE RANKING READ REAL REASSIGN RECHECK RECURSIVE REF_P REFERENCES REFERENCING
+	REFRESH REINDEX REGRESSION RELATIVE_P RELEASE RENAME REPEATABLE REPLACE REPLICA
 	RESET RESTART RESTRICT RETURN RETURNING RETURNS REVOKE RIGHT ROLE ROLLBACK ROLLUP
 	ROUTINE ROUTINES ROW ROWS RULE
 
@@ -761,7 +775,7 @@ static Node *makeRecursiveViewSelect(char *relname, List *aliases, Node *query);
 	START STATEMENT STATISTICS STDIN STDOUT STORAGE STORED STRICT_P STRIP_P
 	SUBSCRIPTION SUBSTRING SUPPORT SYMMETRIC SYSID SYSTEM_P SYSTEM_USER
 
-	TABLE TABLES TABLESAMPLE TABLESPACE TEMP TEMPLATE TEMPORARY TEXT_P THEN
+	TABLE TABLES TABLESAMPLE TABLESPACE TARGET TEMP TEMPLATE TEMPORARY TEXT_P THEN
 	TIES TIME TIMESTAMP TO TRAILING TRANSACTION TRANSFORM
 	TREAT TRIGGER TRIM TRUE_P
 	TRUNCATE TRUSTED TYPE_P TYPES_P
@@ -1017,6 +1031,7 @@ stmt:
 			| CreateFunctionStmt
 			| CreateGroupStmt
 			| CreateMatViewStmt
+			| CreateModelStmt
 			| CreateOpClassStmt
 			| CreateOpFamilyStmt
 			| CreatePublicationStmt
@@ -1064,9 +1079,11 @@ stmt:
 			| ListenStmt
 			| RefreshMatViewStmt
 			| LoadStmt
+			| LoadModelStmt
 			| LockStmt
 			| MergeStmt
 			| NotifyStmt
+			| PredictModelStmt
 			| PrepareStmt
 			| ReassignOwnedStmt
 			| ReindexStmt
@@ -6330,6 +6347,187 @@ enum_val_list:	Sconst
 			| enum_val_list ',' Sconst
 				{ $$ = lappend($1, makeString($3)); }
 		;
+
+/*****************************************************************************
+ *
+ *		QUERY :
+ *				CREATE [CLASSIFICATION | REGRESSION | RANKING] MODEL name ( options ) FROM table
+ *
+ *****************************************************************************/
+CreateModelStmt:
+	CREATE MODEL name   '(' OptModelElementList ')' FROM name
+		{
+			CreateModelStmt *n = makeNode(CreateModelStmt);
+			n->objectType = OBJECT_MODEL;
+			n->modelname = $3;
+			n->tablename = $8;
+			n->options = $5;
+			n->modelclass = MODEL_TYPE_CLASSIFICATION;
+			$$ = (Node *) n;
+		}
+	| CREATE CLASSIFICATION MODEL name '(' OptModelElementList ')' FROM name
+		{
+			CreateModelStmt *n = makeNode(CreateModelStmt);
+			n->objectType = OBJECT_MODEL;
+			n->modelname = $4;
+			n->tablename = $9;
+			n->options = $6;
+			n->modelclass = MODEL_TYPE_CLASSIFICATION;
+			$$ = (Node *) n;
+		}
+	| CREATE REGRESSION MODEL name '(' OptModelElementList ')' FROM name
+		{
+			CreateModelStmt *n = makeNode(CreateModelStmt);
+			n->objectType = OBJECT_MODEL;
+			n->modelname = $4;
+			n->tablename = $9;
+			n->options = $6;
+			n->modelclass = MODEL_TYPE_REGRESSION;
+			$$ = (Node *) n;
+		}
+	| CREATE RANKING MODEL name '(' OptModelElementList ')' FROM name
+		{
+			CreateModelStmt *n = makeNode(CreateModelStmt);
+			n->objectType = OBJECT_MODEL;
+			n->modelname = $4;
+			n->tablename = $9;
+			n->options = $6;
+			n->modelclass = MODEL_TYPE_RANKING;
+			$$ = (Node *) n;
+		}
+	;
+
+	StrModelElementList:
+		StrModelElements							{ $$ = $1; }
+		| /* EMPTY */								{ $$ = NIL; }
+	;
+
+	StrModelElements:
+		StrModelElement								{ $$ = list_make1($1); }
+		| StrModelElements ',' StrModelElement		{ $$ = lappend($1, $3); }
+	;
+
+	StrModelElement: name 							
+		{ 
+			StrModelElement *n = makeNode(StrModelElement);
+			n->value = pstrdup($1);
+			$$ = (Node *) n;
+		}
+	;
+
+	OptModelElementList:
+		OptModelElements							{ $$ = $1; }
+		| /* EMPTY */								{ $$ = NIL; }
+	;
+
+	OptModelElements:
+		OptModelElement								{ $$ = list_make1($1); }
+		| OptModelElements ',' OptModelElement		{ $$ = lappend($1, $3); }
+	;
+
+
+	OptModelElement:
+		TARGET	name
+			{
+				ModelOptElement *n = makeNode(ModelOptElement);
+				n->parm = MODEL_PARAMETER_TARGET;
+				n->value = pstrdup($2);
+				$$ = (Node *) n;
+			}
+		| IGNORED '[' StrModelElementList ']'
+			{
+				ModelOptElement *n = makeNode(ModelOptElement);
+				n->parm = MODEL_PARAMETER_IGNORE;
+				n->value = NULL;
+				n->elements = $3;
+				$$ = (Node *) n;
+			}
+		| IGNORED name
+			{
+				ModelOptElement *n = makeNode(ModelOptElement);
+				n->parm = MODEL_PARAMETER_IGNORE;
+				n->value = pstrdup($2);
+				n->elements = NULL;
+				$$ = (Node *) n;
+			}
+		| LOSS name
+			{
+				ModelOptElement *n = makeNode(ModelOptElement);
+				n->parm = MODEL_PARAMETER_LOSS_FUNCTION;
+				n->value = pstrdup($2);
+				n->elements = NULL;
+				$$ = (Node *) n;
+			}
+		| LOSS FUNCTION name
+			{
+				ModelOptElement *n = makeNode(ModelOptElement);
+				n->parm = MODEL_PARAMETER_LOSS_FUNCTION;
+				n->value = pstrdup($3);
+				n->elements = NULL;
+				$$ = (Node *) n;
+			}
+		| EVAL name
+			{
+				ModelOptElement *n = makeNode(ModelOptElement);
+				n->parm = MODEL_PARAMETER_EVAL_METRIC;
+				n->value = pstrdup($2);
+				n->elements = NULL;
+				$$ = (Node *) n;
+			}
+		| GROUP_P BY name
+			{
+				ModelOptElement *n = makeNode(ModelOptElement);
+				n->parm = MODEL_PARAMETER_GROUP_BY;
+				n->value = pstrdup($3);
+				n->elements = NULL;
+				$$ = (Node *) n;
+			}
+	;
+
+
+/*****************************************************************************
+ *
+ *		QUERY :
+ *				PREDICT [MODEL] name FROM table
+ *
+ *****************************************************************************/
+
+PredictModelStmt:
+		PREDICT name  FROM name
+			{
+				PredictModelStmt *n = makeNode(PredictModelStmt);
+				n->objectType = OBJECT_MODEL;
+				n->modelname = $2;
+				n->tablename = $4;
+				$$ = (Node *) n;
+			}
+		| PREDICT MODEL name  FROM name
+			{
+				PredictModelStmt *n = makeNode(PredictModelStmt);
+				n->objectType = OBJECT_MODEL;
+				n->modelname = $3;
+				n->tablename = $5;
+				$$ = (Node *) n;
+			}
+	;
+
+
+/*****************************************************************************
+ *
+ *		QUERY :
+ *				LOAD MODEL name FROM filename
+ *
+ *****************************************************************************/
+LoadModelStmt:
+	LOAD MODEL name FROM  copy_file_name
+		{
+			LoadModelStmt *n = makeNode(LoadModelStmt);
+			n->objectType = OBJECT_MODEL;
+			n->modelname = $3;
+			n->filename = $5;
+			$$ = (Node *) n;
+		}
+	;
 
 /*****************************************************************************
  *
@@ -16969,6 +17167,7 @@ unreserved_keyword:
 			| CHARACTERISTICS
 			| CHECKPOINT
 			| CLASS
+			| CLASSIFICATION
 			| CLOSE
 			| CLUSTER
 			| COLUMNS
@@ -17018,6 +17217,7 @@ unreserved_keyword:
 			| ENCRYPTED
 			| ENUM_P
 			| ESCAPE
+			| EVAL
 			| EVENT
 			| EXCLUDE
 			| EXCLUDING
@@ -17047,6 +17247,7 @@ unreserved_keyword:
 			| HOUR_P
 			| IDENTITY_P
 			| IF_P
+			| IGNORED
 			| IMMEDIATE
 			| IMMUTABLE
 			| IMPLICIT_P
@@ -17082,6 +17283,7 @@ unreserved_keyword:
 			| LOCK_P
 			| LOCKED
 			| LOGGED
+			| LOSS
 			| MAPPING
 			| MATCH
 			| MATCHED
@@ -17092,6 +17294,7 @@ unreserved_keyword:
 			| MINUTE_P
 			| MINVALUE
 			| MODE
+			| MODEL
 			| MONTH_P
 			| MOVE
 			| NAME_P
@@ -17132,6 +17335,7 @@ unreserved_keyword:
 			| PLANS
 			| POLICY
 			| PRECEDING
+			| PREDICT
 			| PREPARE
 			| PREPARED
 			| PRESERVE
@@ -17144,6 +17348,7 @@ unreserved_keyword:
 			| PUBLICATION
 			| QUOTE
 			| RANGE
+			| RANKING
 			| READ
 			| REASSIGN
 			| RECHECK
@@ -17151,6 +17356,7 @@ unreserved_keyword:
 			| REF_P
 			| REFERENCING
 			| REFRESH
+			| REGRESSION
 			| REINDEX
 			| RELATIVE_P
 			| RELEASE
@@ -17209,6 +17415,7 @@ unreserved_keyword:
 			| SYSTEM_P
 			| TABLES
 			| TABLESPACE
+			| TARGET
 			| TEMP
 			| TEMPLATE
 			| TEMPORARY
@@ -17504,6 +17711,7 @@ bare_label_keyword:
 			| CHECK
 			| CHECKPOINT
 			| CLASS
+			| CLASSIFICATION
 			| CLOSE
 			| CLUSTER
 			| COALESCE
@@ -17575,6 +17783,7 @@ bare_label_keyword:
 			| END_P
 			| ENUM_P
 			| ESCAPE
+			| EVAL
 			| EVENT
 			| EXCLUDE
 			| EXCLUDING
@@ -17611,6 +17820,7 @@ bare_label_keyword:
 			| HOLD
 			| IDENTITY_P
 			| IF_P
+			| IGNORED
 			| ILIKE
 			| IMMEDIATE
 			| IMMUTABLE
@@ -17667,6 +17877,7 @@ bare_label_keyword:
 			| LOCK_P
 			| LOCKED
 			| LOGGED
+			| LOSS
 			| MAPPING
 			| MATCH
 			| MATCHED
@@ -17676,6 +17887,7 @@ bare_label_keyword:
 			| METHOD
 			| MINVALUE
 			| MODE
+			| MODEL
 			| MOVE
 			| NAME_P
 			| NAMES
@@ -17730,6 +17942,7 @@ bare_label_keyword:
 			| POLICY
 			| POSITION
 			| PRECEDING
+			| PREDICT
 			| PREPARE
 			| PREPARED
 			| PRESERVE
@@ -17743,6 +17956,7 @@ bare_label_keyword:
 			| PUBLICATION
 			| QUOTE
 			| RANGE
+			| RANKING
 			| READ
 			| REAL
 			| REASSIGN
@@ -17752,6 +17966,7 @@ bare_label_keyword:
 			| REFERENCES
 			| REFERENCING
 			| REFRESH
+			| REGRESSION
 			| REINDEX
 			| RELATIVE_P
 			| RELEASE
@@ -17822,6 +18037,7 @@ bare_label_keyword:
 			| TABLES
 			| TABLESAMPLE
 			| TABLESPACE
+			| TARGET
 			| TEMP
 			| TEMPLATE
 			| TEMPORARY
